@@ -1,0 +1,1 @@
+// 把 MCP tool 转成 ToolDefinition

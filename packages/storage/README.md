@@ -1,0 +1,1 @@
+> 存储抽象：memory、jsonl、sqlite、postgres
