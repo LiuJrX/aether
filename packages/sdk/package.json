@@ -1,0 +1,13 @@
+{
+  "name": "@aether/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aether/observer": "workspace:*",
+    "@aether/storage": "workspace:*",
+    "@aether/workflow": "workspace:*"
+  }
+}

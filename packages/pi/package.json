@@ -1,0 +1,14 @@
+{
+  "name": "@aether/pi",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aether/observer": "workspace:*",
+    "@aether/storage": "workspace:*",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "dotenv": "^17.2.3"
+  }
+}

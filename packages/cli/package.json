@@ -1,0 +1,14 @@
+{
+  "name": "@aether/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "aether": "./bin/aether.js"
+  },
+  "dependencies": {
+    "@aether/observer": "workspace:*",
+    "@aether/sdk": "workspace:*",
+    "@aether/workflow": "workspace:*",
+    "tsx": "^4.20.6"
+  }
+}

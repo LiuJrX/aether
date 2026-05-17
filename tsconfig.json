@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true,
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": [
+    "extensions/**/*.ts",
+    "packages/cli/src/**/*.ts",
+    "packages/observer/src/**/*.ts",
+    "packages/pi/src/**/*.ts",
+    "packages/storage/src/**/*.ts",
+    "packages/workflow/src/**/*.ts",
+    "packages/sdk/src/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@aether/workflow",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aether/observer": "workspace:*",
+    "@aether/pi": "workspace:*",
+    "yaml": "^2.9.0"
+  }
+}

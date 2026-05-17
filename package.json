@@ -1,0 +1,21 @@
+{
+  "name": "aether",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.8.2",
+  "scripts": {
+    "test": "sh -lc 'node --import tsx --test $(find tests -name \"*.test.ts\" -print | sort)'",
+    "typecheck": "tsc --noEmit",
+    "run:research": "tsx scripts/run-research.ts"
+  },
+  "dependencies": {
+    "@aether/cli": "workspace:*",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@aether/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
