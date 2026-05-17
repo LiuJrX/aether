@@ -76,6 +76,7 @@ export interface RemoteMcpCustomTool {
 
 export interface RemoteMcpDiscoveryResult {
   tools: RemoteMcpDiscoveredTool[]
+  coreTools: RemoteMcpCustomTool[]
   customTools: RemoteMcpCustomTool[]
   dispose: () => Promise<void>
 }

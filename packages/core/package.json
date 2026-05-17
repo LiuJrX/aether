@@ -1,14 +1,13 @@
 {
-  "name": "@aether/pi",
+  "name": "@aether/core",
   "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@aether/core": "workspace:*",
     "@aether/observer": "workspace:*",
-    "@aether/storage": "workspace:*",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.4.2",
+    "typebox": "^1.0.56"
   }
 }

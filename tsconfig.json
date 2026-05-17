@@ -17,6 +17,7 @@
   "include": [
     "extensions/**/*.ts",
     "packages/cli/src/**/*.ts",
+    "packages/core/src/**/*.ts",
     "packages/observer/src/**/*.ts",
     "packages/pi/src/**/*.ts",
     "packages/storage/src/**/*.ts",

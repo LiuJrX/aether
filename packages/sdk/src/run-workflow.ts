@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 
+import type { RuntimeBackend } from "@aether/core"
 import {
   createEventBus,
   createRunId,
@@ -11,6 +12,7 @@ import {
   createFileSystemRunStorage,
   resolveRunDirectories,
 } from "@aether/storage"
+import { createRuntime } from "@aether/pi"
 import {
   loadWorkflowFromFile,
   WorkflowEngine,
@@ -22,6 +24,7 @@ import {
 export interface SdkWorkflowRunOptions
   extends Omit<WorkflowRunOptions, "runId" | "workflowName" | "runDir" | "onEvent"> {
   runId?: string
+  backend?: RuntimeBackend
   onEvent?: AetherRunEventHandler
 }
 
@@ -31,6 +34,12 @@ export interface WorkflowRunHandle {
   runDir: string
   result: Promise<WorkflowRunResult>
   subscribe: (handler: AetherRunEventHandler) => () => void
+}
+
+function toAgentEventHandler(
+  onEvent?: AetherRunEventHandler
+): ((event: unknown) => void) | undefined {
+  return onEvent as ((event: unknown) => void) | undefined
 }
 
 function resolveCwd(cwd?: string): string {
@@ -87,7 +96,10 @@ export function createWorkflowRun(
   const workflowName = workflow.name
   const runId = options.runId ?? createRunId()
   const directories = resolveRunDirectories(cwd, workflowName, runId)
-  const engine = new WorkflowEngine({ cwd })
+  const engine = new WorkflowEngine({
+    cwd,
+    runtime: createRuntime({ backend: options.backend }),
+  })
   const { handle, publish } = createWorkflowRunHandle(
     workflowName,
     runId,
@@ -114,7 +126,7 @@ export function createWorkflowRun(
         runId,
         runDir: storage.runDir,
         sharedDir: storage.sharedDir,
-        onEvent: publishWithStorage,
+        onEvent: toAgentEventHandler(publishWithStorage),
       })
       await storage.flush()
       return result
@@ -147,7 +159,10 @@ export function createWorkflowRunFromFile(
         runId,
       })
       const workflow = await loadWorkflowFromFile(filePath)
-      const engine = new WorkflowEngine({ cwd })
+      const engine = new WorkflowEngine({
+        cwd,
+        runtime: createRuntime({ backend: options.backend }),
+      })
       const publishWithStorage = (event: AetherRunEvent) => {
         void storage.recordEvent(event)
         publish(event)
@@ -160,7 +175,7 @@ export function createWorkflowRunFromFile(
         runId,
         runDir: storage.runDir,
         sharedDir: storage.sharedDir,
-        onEvent: publishWithStorage,
+        onEvent: toAgentEventHandler(publishWithStorage),
       })
       await storage.flush()
       return result
@@ -193,7 +208,10 @@ export function createWorkflowRunByName(
         runId,
       })
       const workflow = await loadWorkflowFromFile(filePath)
-      const engine = new WorkflowEngine({ cwd })
+      const engine = new WorkflowEngine({
+        cwd,
+        runtime: createRuntime({ backend: options.backend }),
+      })
       const publishWithStorage = (event: AetherRunEvent) => {
         void storage.recordEvent(event)
         publish(event)
@@ -206,7 +224,7 @@ export function createWorkflowRunByName(
         runId,
         runDir: storage.runDir,
         sharedDir: storage.sharedDir,
-        onEvent: publishWithStorage,
+        onEvent: toAgentEventHandler(publishWithStorage),
       })
       await storage.flush()
       return result

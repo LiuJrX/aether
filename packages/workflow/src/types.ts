@@ -1,4 +1,4 @@
-import type { AetherRunEventHandler } from "@aether/observer"
+import type { AgentEventHandler } from "@aether/core"
 
 export interface WorkflowDefinition {
   name: string
@@ -19,7 +19,7 @@ export interface WorkflowRunOptions {
   workflowName?: string
   runDir?: string
   sharedDir?: string
-  onEvent?: AetherRunEventHandler
+  onEvent?: AgentEventHandler
 }
 
 export interface WorkflowRunResult {

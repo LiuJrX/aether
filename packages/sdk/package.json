@@ -6,7 +6,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@aether/core": "workspace:*",
     "@aether/observer": "workspace:*",
+    "@aether/pi": "workspace:*",
     "@aether/storage": "workspace:*",
     "@aether/workflow": "workspace:*"
   }

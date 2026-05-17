@@ -6,8 +6,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@aether/core": "workspace:*",
     "@aether/observer": "workspace:*",
-    "@aether/pi": "workspace:*",
     "yaml": "^2.9.0"
   }
 }

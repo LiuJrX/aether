@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@aether/cli": "workspace:*",
-    "@earendil-works/pi-coding-agent": "^0.74.0",
     "@aether/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "typebox": "^1.1.38",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

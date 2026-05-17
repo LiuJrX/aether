@@ -1,3 +1,4 @@
+import { buildCoreTools } from "./core-tools.js"
 import { buildPiTools } from "./pi-tools.js"
 import { loadRemoteMcpConfigs } from "./config.js"
 import { discoverRemoteMcpTools } from "./discovery.js"
@@ -9,6 +10,7 @@ export async function loadRemoteMcpTools(): Promise<RemoteMcpDiscoveryResult> {
   if (configs.length === 0) {
     return {
       tools: [],
+      coreTools: [],
       customTools: [],
       dispose: async () => undefined,
     }
@@ -21,6 +23,7 @@ export async function loadRemoteMcpTools(): Promise<RemoteMcpDiscoveryResult> {
 
   return {
     tools,
+    coreTools: buildCoreTools(tools, clientsByServer),
     customTools: buildPiTools(tools, clientsByServer),
     dispose: async () => {
       await Promise.all(clients.map((client) => client.dispose()))

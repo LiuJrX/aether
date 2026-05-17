@@ -1,15 +1,15 @@
 # Aether
 
-Aether 是一个轻量 agent runtime，用来加载 workflow、驱动 Pi session、接入远程 MCP 工具，并把一次运行的系统元数据与业务产物统一落到 `.aether/` 目录下。
+Aether 是一个轻量 agent runtime，用来加载 workflow、驱动内建 agent session、接入远程 MCP 工具，并把一次运行的系统元数据与业务产物统一落到 `.aether/` 目录下。
 
 ## 当前阶段
 
 当前仓库已经具备这些能力：
 
 - 通过 `aether run workflow_name` 运行标准目录下的 workflow
-- 使用 `@earendil-works/pi-coding-agent` 作为底层 agent runtime
+- 使用项目内建的 `packages/core/src/ai` 与 `packages/core/src/agent` 作为底层 runtime
 - 从项目根目录 `.env` 读取大模型配置
-- 接入远程 MCP，并把可用工具暴露给 Pi
+- 接入远程 MCP，并把可用工具暴露给运行时
 - 在运行时记录结构化事件、stage turn 快照和 run 元数据
 - 将 workflow 业务产物与 Aether 系统文件分目录落盘
 
@@ -135,8 +135,9 @@ AETHER_LOG_LEVEL=verbose AETHER_OUTPUT_FORMAT=summary pnpm exec aether run resea
 
 - [packages/cli](packages/cli)：正式 CLI 入口与终端 presenter
 - [packages/sdk](packages/sdk)：对外运行入口与编排层
+- [packages/core](packages/core)：最小 agent core、OpenAI-compatible provider、builtin tools
 - [packages/workflow](packages/workflow)：workflow 加载、模板渲染、stage 执行
-- [packages/pi](packages/pi)：Pi session 创建、tool 注入、agent loop 事件采集
+- [packages/pi](packages/pi)：薄兼容层、runtime 创建入口、tool / MCP 接线
 - [packages/observer](packages/observer)：结构化运行事件协议
 - [packages/storage](packages/storage)：run storage 与 `.aether/runs` 持久化
 - [extensions/remote-mcp](extensions/remote-mcp)：远程 MCP 接入

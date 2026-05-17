@@ -1,12 +1,52 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 
+import type { AgentRuntime, AgentSession } from "../../packages/core/src/agent/index.js"
 import type { AetherRunEvent } from "../../packages/observer/src/index.js"
 import { WorkflowEngine } from "../../packages/workflow/src/engine.js"
 import type { WorkflowDefinition } from "../../packages/workflow/src/types.js"
 
+function createSession(overrides?: Partial<AgentSession>): AgentSession {
+  return {
+    prompt: overrides?.prompt ?? (async () => undefined),
+    getActiveToolNames: overrides?.getActiveToolNames ?? (() => ["write"]),
+    getAllTools: overrides?.getAllTools ?? (() => [{ name: "write" }]),
+    setActiveToolsByName:
+      overrides?.setActiveToolsByName ?? (() => undefined),
+    setToolContext: overrides?.setToolContext ?? (() => undefined),
+    state: overrides?.state ?? { messages: [] },
+    subscribe: overrides?.subscribe ?? (() => () => undefined),
+    dispose: overrides?.dispose ?? (() => undefined),
+  }
+}
+
+function createRuntime(createSessionImpl?: AgentRuntime["createSession"]): AgentRuntime {
+  return {
+    createSession:
+      createSessionImpl ??
+      (async () =>
+        createSession()),
+  }
+}
+
 test("WorkflowEngine runs stages sequentially and passes previous output", async () => {
   const prompts: string[] = []
+  const messagesByPrompt = new Map<string, string>([
+    ["topic=Aether previous=", "first output"],
+    ["follow=first output", "second output"],
+  ])
+
+  const session = createSession({
+    prompt: async (prompt) => {
+      prompts.push(prompt)
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: messagesByPrompt.get(prompt) ?? "" }],
+        },
+      ]
+    },
+  })
 
   const workflow: WorkflowDefinition = {
     name: "demo",
@@ -17,29 +57,7 @@ test("WorkflowEngine runs stages sequentially and passes previous output", async
   }
 
   const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["read", "bash", "edit", "write"],
-        getAllTools: () => [{ name: "read" }, { name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["read", "bash", "edit", "write"],
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async (_session, options) => {
-      prompts.push(options.prompt)
-      return {
-        ok: true,
-        output: options.prompt.includes("follow=") ? "second output" : "first output",
-      }
-    },
+    runtime: createRuntime(async () => session),
   })
 
   const result = await engine.run(workflow, {
@@ -57,6 +75,26 @@ test("WorkflowEngine runs stages sequentially and passes previous output", async
 test("WorkflowEngine keeps previous successful output when a stage fails", async () => {
   const prompts: string[] = []
 
+  const session = createSession({
+    prompt: async (prompt) => {
+      prompts.push(prompt)
+      if (prompt.startsWith("two")) {
+        throw new Error("boom")
+      }
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: prompt.startsWith("three") ? "third ok" : "first ok",
+            },
+          ],
+        },
+      ]
+    },
+  })
+
   const workflow: WorkflowDefinition = {
     name: "demo",
     stages: [
@@ -67,35 +105,7 @@ test("WorkflowEngine keeps previous successful output when a stage fails", async
   }
 
   const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["write"],
-        getAllTools: () => [{ name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["write"],
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async (_session, options) => {
-      prompts.push(options.prompt)
-
-      if (options.prompt.startsWith("two")) {
-        return { ok: false, output: "", error: "boom" }
-      }
-
-      if (options.prompt.startsWith("three")) {
-        return { ok: true, output: "third ok" }
-      }
-
-      return { ok: true, output: "first ok" }
-    },
+    runtime: createRuntime(async () => session),
   })
 
   const result = await engine.run(workflow)
@@ -117,6 +127,17 @@ test("WorkflowEngine keeps previous successful output when a stage fails", async
 })
 
 test("WorkflowEngine records template rendering failures and continues", async () => {
+  const session = createSession({
+    prompt: async () => {
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "done" }],
+        },
+      ]
+    },
+  })
+
   const workflow: WorkflowDefinition = {
     name: "demo",
     stages: [
@@ -126,26 +147,7 @@ test("WorkflowEngine records template rendering failures and continues", async (
   }
 
   const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["write"],
-        getAllTools: () => [{ name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["write"],
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async () => ({
-      ok: true,
-      output: "done",
-    }),
+    runtime: createRuntime(async () => session),
   })
 
   const result = await engine.run(workflow)
@@ -159,51 +161,61 @@ test("WorkflowEngine records template rendering failures and continues", async (
   assert.equal(result.stages[1]?.ok, true)
 })
 
-test("WorkflowEngine passes stage ids into runTask", async () => {
-  const stageIds: string[] = []
+test("WorkflowEngine injects stage tool context before prompting", async () => {
+  const observedContexts: Array<{ baseDir?: string; sharedDir?: string }> = []
 
-  const workflow: WorkflowDefinition = {
-    name: "demo",
-    stages: [
-      { id: "gather", prompt: "one" },
-      { id: "summarize", prompt: "two" },
-    ],
-  }
-
-  const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["write"],
-        getAllTools: () => [{ name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["write"],
-      currentStageId: undefined,
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async (_session, options) => {
-      stageIds.push(options.stageId ?? "")
-      return {
-        ok: true,
-        output: options.prompt,
-      }
+  const session = createSession({
+    setToolContext: (context) => {
+      observedContexts.push({
+        baseDir: context.baseDir,
+        sharedDir: context.sharedDir,
+      })
+    },
+    prompt: async () => {
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "done" }],
+        },
+      ]
     },
   })
 
-  await engine.run(workflow)
+  const workflow: WorkflowDefinition = {
+    name: "demo",
+    stages: [{ id: "gather", prompt: "one" }],
+  }
 
-  assert.deepEqual(stageIds, ["gather", "summarize"])
+  const engine = new WorkflowEngine({
+    runtime: createRuntime(async () => session),
+  })
+
+  await engine.run(workflow, {
+    runDir: "/tmp/aether/.aether/runs/demo_20260517",
+    sharedDir: "/tmp/aether/.aether/runs/demo_20260517/workspace/shared",
+  })
+
+  assert.deepEqual(observedContexts, [
+    {
+      baseDir: "/tmp/aether/.aether/runs/demo_20260517/workspace/stages/0",
+      sharedDir: "/tmp/aether/.aether/runs/demo_20260517/workspace/shared",
+    },
+  ])
 })
 
 test("WorkflowEngine injects workflow run context into template variables", async () => {
   const prompts: string[] = []
+  const session = createSession({
+    prompt: async (prompt) => {
+      prompts.push(prompt)
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "done" }],
+        },
+      ]
+    },
+  })
 
   const workflow: WorkflowDefinition = {
     name: "demo",
@@ -213,30 +225,7 @@ test("WorkflowEngine injects workflow run context into template variables", asyn
   }
 
   const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["write"],
-        getAllTools: () => [{ name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["write"],
-      currentStageId: undefined,
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async (_session, options) => {
-      prompts.push(options.prompt)
-      return {
-        ok: true,
-        output: "done",
-      }
-    },
+    runtime: createRuntime(async () => session),
   })
 
   await engine.run(workflow, {
@@ -252,64 +241,63 @@ test("WorkflowEngine injects workflow run context into template variables", asyn
 
 test("WorkflowEngine emits structured lifecycle events", async () => {
   const events: AetherRunEvent[] = []
+  let listener: ((event: import("../../packages/core/src/agent/index.js").AgentEvent) => void) | undefined
+
+  const session = createSession({
+    prompt: async () => {
+      listener?.({
+        type: "tool_execution_start",
+        toolName: "write",
+        args: { path: "report.md" },
+      })
+      listener?.({
+        type: "tool_execution_end",
+        toolName: "write",
+        args: { path: "report.md" },
+        result: {
+          content: [{ type: "text", text: "done" }],
+        },
+        isError: false,
+      })
+      session.state.messages = [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "done" }],
+        },
+      ]
+    },
+    subscribe: (nextListener) => {
+      listener = nextListener
+      return () => undefined
+    },
+  })
 
   const workflow: WorkflowDefinition = {
     name: "demo",
-    stages: [
-      { id: "gather", prompt: "one", tools: ["write"] },
-    ],
+    stages: [{ id: "gather", prompt: "one", tools: ["write"] }],
   }
 
   const engine = new WorkflowEngine({
-    createSession: async () => ({
-      session: {
-        prompt: async () => undefined,
-        getActiveToolNames: () => ["write"],
-        getAllTools: () => [{ name: "write" }],
-        setActiveToolsByName: () => undefined,
-        state: { messages: [] },
-        subscribe: () => () => undefined,
-        dispose: () => undefined,
-      },
-      defaultToolNames: ["write"],
-      currentStageId: undefined,
-      workflowName: "demo",
-      currentTurnIndex: 0,
-      currentToolCallIndex: 0,
-      currentTurnOpen: false,
-    }),
-    runTask: async (_session, options) => {
-      options.onEvent?.({
-        type: "stage.tools.activated",
-        runId: options.runId,
-        timestamp: "2026-05-17T00:00:00.000Z",
-        workflowName: options.workflowName,
-        stageIndex: options.stageIndex,
-        stageId: options.stageId ?? "unknown",
-        declaredTools: options.allowedTools ?? [],
-        tools: ["write"],
-      })
-
-      return {
-        ok: true,
-        output: "done",
-      }
-    },
+    runtime: createRuntime(async () => session),
   })
 
   await engine.run(workflow, {
     runId: "run_test",
-    onEvent: (event: AetherRunEvent) => {
+    onEvent: ((event: AetherRunEvent) => {
       events.push(event)
-    },
+    }) as (event: unknown) => void,
   })
 
   assert.deepEqual(
     events.map((event) => event.type),
     [
+      "session.created",
       "workflow.started",
       "stage.started",
       "stage.tools.activated",
+      "stage.turn.started",
+      "tool.started",
+      "tool.finished",
       "stage.finished",
       "workflow.finished",
     ]

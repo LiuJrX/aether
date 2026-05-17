@@ -1,8 +1,9 @@
 import path from "node:path"
+import type { AgentRuntime } from "@aether/core"
 import { createEventBus, createRunId } from "@aether/observer"
-import { createSession, runTask } from "@aether/pi"
 
 import { renderTemplate } from "./template.js"
+import { runStage } from "./stage-runner.js"
 import type {
   WorkflowDefinition,
   WorkflowRunOptions,
@@ -13,19 +14,16 @@ import type {
 export class WorkflowEngine {
   private readonly cwd?: string
   private readonly systemPrompt?: string
-  private readonly createSessionImpl: typeof createSession
-  private readonly runTaskImpl: typeof runTask
+  private readonly runtime: AgentRuntime
 
-  constructor(options?: {
+  constructor(options: {
     cwd?: string
     systemPrompt?: string
-    createSession?: typeof createSession
-    runTask?: typeof runTask
+    runtime: AgentRuntime
   }) {
-    this.cwd = options?.cwd
-    this.systemPrompt = options?.systemPrompt
-    this.createSessionImpl = options?.createSession ?? createSession
-    this.runTaskImpl = options?.runTask ?? runTask
+    this.cwd = options.cwd
+    this.systemPrompt = options.systemPrompt
+    this.runtime = options.runtime
   }
 
   async run(
@@ -35,14 +33,21 @@ export class WorkflowEngine {
     const cwd = options?.cwd ?? this.cwd ?? process.cwd()
     const runId = options?.runId ?? createRunId()
     const eventBus = createEventBus(runId, options?.onEvent)
-    const session = await this.createSessionImpl({
+    const session = await this.runtime.createSession({
       cwd,
-      runDir: options?.runDir,
-      sharedDir: options?.sharedDir,
       systemPrompt: this.systemPrompt,
+    })
+
+    const remoteTools = session
+      .getAllTools()
+      .map((tool) => tool.name)
+      .filter((toolName) => toolName.startsWith("mcp."))
+
+    eventBus.emit("session.created", {
       workflowName: options?.workflowName ?? workflow.name,
-      runId,
-      onEvent: options?.onEvent,
+      cwd,
+      remoteToolCount: remoteTools.length,
+      remoteTools,
     })
 
     eventBus.emit("workflow.started", {
@@ -103,7 +108,8 @@ export class WorkflowEngine {
           continue
         }
 
-        const result = await this.runTaskImpl(session, {
+        const result = await runStage({
+          session,
           prompt: renderedPrompt,
           allowedTools: stage.tools,
           stageId: stage.id,
@@ -112,7 +118,8 @@ export class WorkflowEngine {
           cwd,
           workflowName: options?.workflowName ?? workflow.name,
           runId,
-          onEvent: options?.onEvent,
+          sharedDir: options?.sharedDir,
+          onEvent: options?.onEvent as ((event: unknown) => void) | undefined,
         })
 
         stages.push({
@@ -136,7 +143,7 @@ export class WorkflowEngine {
         })
       }
     } finally {
-      session.session.dispose()
+      session.dispose()
     }
 
     eventBus.emit("workflow.finished", {
